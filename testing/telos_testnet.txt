@@ -1,0 +1,102 @@
+# Telos testnet
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutadmin1 EOS5znzpWwmMwWcvCL3YKpBMfoS2jc8Jjo5Dp2XQDw8yLuauh4AHC
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutfees11 EOS5znzpWwmMwWcvCL3YKpBMfoS2jc8Jjo5Dp2XQDw8yLuauh4AHC
+
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutpayer1 EOS8BdYSA89k6gvSgm2RM7mySQX4vL1kcW4HAvuLvMy6pVHpUok9L
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutpayer2 EOS8BdYSA89k6gvSgm2RM7mySQX4vL1kcW4HAvuLvMy6pVHpUok9L
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutpayer3 EOS8BdYSA89k6gvSgm2RM7mySQX4vL1kcW4HAvuLvMy6pVHpUok9L
+
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutrcpt11 EOS8MBCm1iqESGhkyDFazJoE4XSyeqcVTkCar3yxWMpPJmpEQgUrj
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutrcpt12 EOS8MBCm1iqESGhkyDFazJoE4XSyeqcVTkCar3yxWMpPJmpEQgUrj
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutrcpt13 EOS8MBCm1iqESGhkyDFazJoE4XSyeqcVTkCar3yxWMpPJmpEQgUrj
+
+tTcleos system newaccount --buy-ram-kbytes 20  --stake-net "1 TLOS" --stake-cpu "1 TLOS" cc32dninexxx payoutrcpt14 EOS8MBCm1iqESGhkyDFazJoE4XSyeqcVTkCar3yxWMpPJmpEQgUrj
+
+
+#########  admin
+
+tTcleos push action payoutengine setadmin '["payoutadmin1"]' -p payoutadmin1
+# error: missing authority of payoutengine
+
+tTcleos push action payoutengine setfee '["payoutfees11", "5"]' -p payoutadmin1
+# error: missing authority of payoutengine
+
+tTcleos push action payoutengine setadmin '["payoutadmin1"]' -p payoutengine
+# ok
+
+tTcleos push action payoutengine setadmin '["payoutadmin1"]' -p payoutengine
+# error: missing authority of payoutadmin1
+
+tTcleos push action payoutengine setfee '["payoutfees11", "5"]' -p payoutadmin1
+# ok
+
+
+tTcleos push action payoutengine approveacc '[["payoutrcpt14"]]' -p payoutadmin1
+# error: Account not found in unapproved list
+
+tTcleos push action payoutengine unapproveacc '[["payoutrcpt14"]]' -p payoutadmin1
+# error: Account not found in approved list
+
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutadmin1
+# error: missing authority of payoutpayer1
+
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer1
+# ok
+
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer1
+# error: A schedule with this name already exists
+
+
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc2", "eosio.token", "1.00 TLOS", "Welcome to the test"]' -p payoutpayer1
+# error: Wrong currency precision
+
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc2", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer1
+# ok
+
+tTcleos push action payoutengine newschedule '["payoutpayer2", "payer1sc2", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer2
+# error: A schedule with this name already exists
+
+tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer2
+# ok
+
+tTcleos transfer payoutpayer3 payoutengine "10.0000 TLOS"
+# error: There are no schedules with this currency for this payer
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "1.0000 TLOS"], ["payoutrcpt12", "1.0000 TLOS"]]]' -p payoutpayer2
+# error: missing authority of payoutpayer1
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "1.0000 TLOS"], ["payoutrcpt12", "1.0000 TLOS"]]]' -p payoutpayer1
+# error: Insufficient funds on the deposit
+
+tTcleos transfer payoutpayer1 payoutengine "10.0000 TLOS"
+# ok
+# payoutfees11 received 0.0500 TLOS
+# payoutengine received 9.9500 TLOS
+# payoutpayer1 funds deposited: "9.9500 TLOS"
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "1.0000 TLOS"], ["payoutrcpt12", "1.0000 TLOS"]]]' -p payoutpayer1
+# ok
+# payoutpayer1 funds: "dues": "2.0000 TLOS", "deposited": "9.9500 TLOS"
+
+tTcleos transfer payoutpayer1 payoutengine "10.0000 TLOS"
+# ok
+# payoutfees11 received 0.0500 TLOS
+# payoutengine received 9.9500 TLOS
+# payoutpayer1 funds "dues": "2.0000 TLOS", "deposited": "19.9000 TLOS"
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# ok (no transfers)
+# props: lastschedule=payer1sc1
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# error: Nothing to do
+
+

@@ -102,6 +102,14 @@ CONTRACT payout : public eosio::contract {
     check(is_account(tkcontract), "Token contract account does not exist");
     check(currency.is_valid(), "invalid currency" );
 
+    // validate that such token exists
+    {
+      stats_table statstbl(tkcontract, currency.symbol.code().raw());
+      auto statsitr = statstbl.find(currency.symbol.code().raw());
+      check(statsitr != statstbl.end(), "This currency symbol does not exist");
+      check(statsitr->supply.symbol.precision() == currency.symbol.precision(), "Wrong currency precision");
+    }
+                           
     currency.amount = 0;
 
     funds fnd(_self, payer.value);
@@ -309,6 +317,32 @@ CONTRACT payout : public eosio::contract {
     }
   }
 
+  // for testing purposes only!
+  ACTION wipeall(uint16_t count)
+  {
+    require_auth(_self);
+
+    schedules sched(_self, 0);
+    auto scitr = sched.begin();
+
+    while( scitr != sched.end() && count-- > 0 ) {
+      
+      funds fnd(_self, scitr->payer.value);
+      auto fnditr = fnd.begin();
+      while( fnditr != fnd.end() ) {
+        fnditr = fnd.erase(fnditr);
+      }
+
+      recipients rcpts(_self, scitr->schedule_name.value);
+      auto rcitr = rcpts.begin();
+      while( rcitr != rcpts.end() ) {
+        rcitr = rcpts.erase(rcitr);
+      }
+
+      scitr = sched.erase(scitr);
+    }
+  }
+    
 
  private:
 
@@ -531,7 +565,18 @@ CONTRACT payout : public eosio::contract {
 
     fnd.modify( *fnditr, same_payer, [&]( auto& row ) {
                                        row.dues -= due;
+                                       row.deposited -= due;
                                      });
   }
 
+  // eosio.token structure
+  struct currency_stats {
+    asset  supply;
+    asset  max_supply;
+    name issuer;
+
+    uint64_t primary_key()const { return supply.symbol.code().raw(); }
+  };
+
+  typedef eosio::multi_index<"stat"_n, currency_stats> stats_table;
 };
