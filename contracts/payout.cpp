@@ -25,9 +25,13 @@
 
 using namespace eosio;
 using std::string;
+using std::vector;
 
 CONTRACT payout : public eosio::contract {
  public:
+
+  const uint16_t MAX_WALK = 30; // maximum walk through unapproved accounts
+
   payout( name self, name code, datastream<const char*> ds ):
     contract(self, code, ds)
     {}
@@ -60,7 +64,7 @@ CONTRACT payout : public eosio::contract {
     unapproved_tbl unappr(_self, 0);
 
     for( name& acc: accounts ) {
-      auto itr = unappr.find(acc);
+      auto itr = unappr.find(acc.value);
       check(itr != unappr.end(), "Account not found in unapproved list");
       appr.emplace(_self, [&]( auto& row ) {
                             row.account = acc;
@@ -78,7 +82,7 @@ CONTRACT payout : public eosio::contract {
     unapproved_tbl unappr(_self, 0);
 
     for( name& acc: accounts ) {
-      auto itr = appr.find(acc);
+      auto itr = appr.find(acc.value);
       check(itr != appr.end(), "Account not found in approved list");
       unappr.emplace(_self, [&]( auto& row ) {
                               row.account = acc;
@@ -90,10 +94,10 @@ CONTRACT payout : public eosio::contract {
 
   ACTION newschedule(name payer, name tkcontract, asset currency, string memo)
   {
-    requre_auth(payer);
+    require_auth(payer);
 
     schedules sched(_self, 0);
-    auto scitr = sched.find(payer);
+    auto scitr = sched.find(payer.value);
     check(scitr == sched.end(), "A schedule for this payer already exists");
     check(is_account(tkcontract), "Token contract account does not exist");
     check(currency.is_valid(), "invalid currency" );
@@ -107,6 +111,7 @@ CONTRACT payout : public eosio::contract {
                            row.memo = memo;
                            row.dues = currency;
                            row.deposited = currency;
+                           row.last_processed.value = 1; // the dues index position
                          });
   }
 
@@ -116,13 +121,13 @@ CONTRACT payout : public eosio::contract {
   struct book_record {
     name  recipient;
     asset new_total;
-  }
+  };
 
   ACTION book(name payer, vector<book_record> records)
   {
-    requre_auth(payer);
+    require_auth(payer);
     schedules sched(_self, 0);
-    auto scitr = sched.find(from);
+    auto scitr = sched.find(payer.value);
     check(scitr != sched.end(), "Cannot find the schedule");
 
     asset new_dues = scitr->currency;
@@ -134,7 +139,7 @@ CONTRACT payout : public eosio::contract {
     for( auto& rec: records ) {
 
       check(rec.new_total.symbol == scitr->currency.symbol, "Invalid currency symbol");
-      auto rcitr = rcpts.find(rec.recipient);
+      auto rcitr = rcpts.find(rec.recipient.value);
 
       if( rcitr == rcpts.end() ) {
         // register a new recipient
@@ -146,8 +151,8 @@ CONTRACT payout : public eosio::contract {
                              });
 
         // new recipients go to unapproved list unless approved in another schedule
-        if( appr.find(rec.recipient) == appr.end() &&
-            unappr.find(rec.recipient) == unappr.end() ) {
+        if( appr.find(rec.recipient.value) == appr.end() &&
+            unappr.find(rec.recipient.value) == unappr.end() ) {
           unappr.emplace(payer, [&]( auto& row ) {
                                   row.account = rec.recipient;
                                 });
@@ -155,8 +160,8 @@ CONTRACT payout : public eosio::contract {
       }
       else {
         // update an existing recipient
-        check(rec.new_total > rcitr->booked_total, "New total must be bigger than the old total");
-        new_dues += rec.new_total - rcitr->booked_total;
+        check(rec.new_total.amount > rcitr->booked_total, "New total must be bigger than the old total");
+        new_dues.amount += rec.new_total.amount - rcitr->booked_total;
         rcpts.modify( *rcitr, same_payer, [&]( auto& row ) {
                                             row.booked_total = rec.new_total.amount;
                                           });
@@ -170,17 +175,115 @@ CONTRACT payout : public eosio::contract {
   }
 
 
-  // recipient can claim the transfer instead of waiting for automatic job
+  // recipient can claim the transfer instead of waiting for automatic job (no authorization needed)
   ACTION claim(name payer, name recipient)
   {
-    requre_auth(payer);
+    schedules sched(_self, 0);
+    auto scitr = sched.find(payer.value);
+    check(scitr != sched.end(), "Cannot find the schedule");
 
+    recipients rcpts(_self, payer.value);
+    auto rcitr = rcpts.find(recipient.value);
+    check(rcitr != rcpts.end(), "Cannot find this recipient in the schedule");
+    check(rcitr->booked_total > rcitr->paid_total, "All dues are paid already");
+
+    _pay_due(payer, recipient);
   }
+
 
   // payout job that serves up to so many payments (no authorization needed)
   ACTION runpayouts(uint16_t count)
   {
+    bool done_something = false;
+    unapproved_tbl unappr(_self, 0);
+
+    while( count-- > 0 ) {
+      name last_schedule = get_name_prop(name("lastschedule"));
+      name old_last_schedule = last_schedule;
+      if( last_schedule.value == 0 ) {
+        last_schedule.value = 1;
+      }
+
+      schedules sched(_self, 0);
+      auto schedidx = sched.get_index<name("dues")>();
+      auto scitr = schedidx.lower_bound(last_schedule.value);
+      if( scitr == schedidx.end() ) {
+        // we're at the end of active schedules, abort the loop
+        count = 0;
+        last_schedule.value = 1;
+      }
+      else {
+        name payer = scitr->payer;
+        last_schedule = payer;
+        uint64_t last_processed = scitr->last_processed.value;
+        uint64_t old_last_processed = last_processed;
+        recipients rcpts(_self, payer.value);
+        auto rcdidx = rcpts.get_index<name("dues")>();
+        auto rcitr = rcdidx.lower_bound(last_processed);
+
+        uint16_t walk_limit = MAX_WALK;
+        bool paid = false;
+        while( !paid && walk_limit-- > 0 ) {
+          if( rcitr == rcdidx.end() ) {
+            // end of recpients list, abort the loop
+            walk_limit = 0;
+            last_processed = 1;
+          }
+          else {
+            last_processed = rcitr->account.value;
+            if( unappr.find(rcitr->account.value) != unappr.end() ) {
+              // this is an unapproved account, skip to the next
+              rcitr++;
+            }
+            else {
+              _pay_due(payer, rcitr->account);
+              paid = true;
+            }
+          }
+        }
+
+        if( last_processed != old_last_processed ) {
+          sched.modify( *scitr, same_payer, [&]( auto& row ) {
+                                              row.last_processed.value = last_processed;
+                                            });
+          done_something = true;
+        }
+      }
+
+      if( last_schedule != old_last_schedule ) {
+        set_name_prop(name("lastschedule"), last_schedule);
+        done_something = true;
+      }
+    }
+
+    check(done_something, "Nothing to do");
   }
+
+  [[eosio::on_notify("*::transfer")]] void on_payment (name from, name to, asset quantity, string memo) {
+    if(to == _self) {
+      schedules sched(_self, 0);
+      auto scitr = sched.find(from.value);
+      check(scitr != sched.end(), "Only payments from registered payers allowed");
+      check(name{get_first_receiver()} == scitr->tkcontract, "invalid token contract");
+      check(quantity.symbol == scitr->currency.symbol, "invalid currency symbol");
+      check(quantity.amount > 0, "expected a positive amount");
+
+      uint64_t feepermille = get_uint_prop(name("feepermille"));
+      name feeacc = get_name_prop(name("feeacc"));
+
+      if( feepermille > 0 && feeacc != name("") ) {
+        asset fee = quantity * feepermille / 1000;
+        quantity -= fee;
+        extended_asset xfee(fee, scitr->tkcontract);
+        send_payment(feeacc, xfee, scitr->memo);
+      }
+
+      sched.modify( *scitr, same_payer, [&]( auto& row ) {
+                                          row.deposited += quantity;
+                                        });
+    }
+  }
+
 
  private:
 
@@ -199,7 +302,7 @@ CONTRACT payout : public eosio::contract {
   void set_name_prop(name key, name value)
   {
     props p(_self, 0);
-    auto itr = p.find(key);
+    auto itr = p.find(key.value);
     if( itr != p.end() ) {
       p.modify( *itr, same_payer, [&]( auto& row ) {
                                     row.val_name = value;
@@ -216,7 +319,7 @@ CONTRACT payout : public eosio::contract {
   name get_name_prop(name key)
   {
     props p(_self, 0);
-    auto itr = p.find(key);
+    auto itr = p.find(key.value);
     if( itr != p.end() ) {
       return itr->val_name;
     }
@@ -232,7 +335,7 @@ CONTRACT payout : public eosio::contract {
   void set_uint_prop(name key, uint64_t value)
   {
     props p(_self, 0);
-    auto itr = p.find(key);
+    auto itr = p.find(key.value);
     if( itr != p.end() ) {
       p.modify( *itr, same_payer, [&]( auto& row ) {
                                     row.val_uint = value;
@@ -249,7 +352,7 @@ CONTRACT payout : public eosio::contract {
   uint64_t get_uint_prop(name key)
   {
     props p(_self, 0);
-    auto itr = p.find(key);
+    auto itr = p.find(key.value);
     if( itr != p.end() ) {
       return itr->val_uint;
     }
@@ -296,8 +399,9 @@ CONTRACT payout : public eosio::contract {
   };
 
   typedef eosio::multi_index<
+    name("schedules"), schedule,
     indexed_by<name("dues"), const_mem_fun<schedule, uint64_t, &schedule::by_dues>>
-    name("schedules"), schedule> schedules;
+    > schedules;
 
 
   // payment recipients, scope=payer
@@ -312,18 +416,19 @@ CONTRACT payout : public eosio::contract {
   };
 
   typedef eosio::multi_index<
+    name("recipients"), recipient,
     indexed_by<name("dues"), const_mem_fun<recipient, uint64_t, &recipient::by_dues>>
-    name("recipients"), recipient> recipients;
+    > recipients;
 
 
   void req_admin()
   {
     name admin = get_name_prop(name("adminacc"));
     if( admin == name("") ) {
-      requre_auth(_self);
+      require_auth(_self);
     }
     else {
-      requre_auth(admin);
+      require_auth(admin);
     }
   }
 
@@ -350,38 +455,14 @@ CONTRACT payout : public eosio::contract {
       }.send();
   }
 
-  [[eosio::on_notify("*::transfer")]] void on_handler (name from, name to, asset quantity, string memo) {
-    if(to == _self) {
-      schedules sched(_self, 0);
-      auto scitr = sched.find(from);
-      check(scitr != sched.end(), "Only payments from registered payers allowed");
-      check(name{get_first_receiver()} == scitr->tkcontract, "invalid token contract");
-      check(quantity.symbol == scitr->currency.symbol, "invalid currency symbol");
-      check(quantity.amount > 0, "expected a positive amount");
-
-      uint64_t feepermille = get_uint_prop("feepermille");
-      name feeacc = get_name_prop(name("feeacc"));
-
-      if( feepermille > 0 && feeacc != name("") ) {
-        asset fee = quantity * feepermille / 1000;
-        quantity -= fee;
-        extended_asset xfee(fee, scitr->tkcontract);
-        send_payment(feeacc, xfee, scitr->memo);
-      }
-
-      sched.modify( *scitr, same_payer, [&]( auto& row ) {
-                                          row.deposited += quantity;
-                                        });
-    }
-  }
 
   // does not check any validity, just performs a transfer and bookeeping
   void _pay_due(name payer, name recipient) {
     schedules sched(_self, 0);
-    auto scitr = sched.find(payer);
+    auto scitr = sched.find(payer.value);
 
     recipients rcpts(_self, payer.value);
-    auto rcitr = rcpts.find(recipient);
+    auto rcitr = rcpts.find(recipient.value);
 
     asset due(rcitr->booked_total - rcitr->paid_total, scitr->currency.symbol);
     extended_asset pay(due, scitr->tkcontract);
@@ -390,10 +471,10 @@ CONTRACT payout : public eosio::contract {
     rcpts.modify( *rcitr, same_payer, [&]( auto& row ) {
                                         row.paid_total = row.booked_total;
                                       });
-    
+
     sched.modify( *scitr, same_payer, [&]( auto& row ) {
-                                        row.dues -= pay;
+                                        row.dues -= due;
                                       });
   }
-  
+
 };
