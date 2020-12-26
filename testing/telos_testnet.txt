@@ -99,4 +99,57 @@ tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
 tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
 # error: Nothing to do
 
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "1.0000 TLOS"], ["payoutrcpt12", "1.0000 TLOS"], ["payoutrcptxx", "1.0000 TLOS"]]]' -p payoutpayer1
+# error: New total must be bigger than the old total
 
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "2.0000 TLOS"], ["payoutrcpt12", "2.0000 TLOS"], ["payoutrcptxx", "1.0000 TLOS"]]]' -p payoutpayer1
+# error: recipient account does not exist
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "2.0000 TLOS"], ["payoutrcpt12", "2.0000 TLOS"], ["payoutrcpt13", "2.0000 TLOS"]]]' -p payoutpayer1
+# ok
+# funds: "dues": "6.0000 TLOS",  "deposited": "19.9000 TLOS"
+# recipients: 3x  "booked_total": 20000, "paid_total": 0
+# approvals: 3 accounts, approved=0
+
+
+tTcleos push action payoutengine unapproveacc '[["payoutrcpt12"]]' -p payoutadmin1
+# error: Nothing to do
+
+tTcleos push action payoutengine approveacc '[["payoutrcpt12"]]' -p payoutadmin1
+# ok
+# approvals: 1 acc approved
+
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# ok
+# transfer        {"from":"payoutengine","to":"payoutrcpt12","quantity":"2.0000 TLOS","memo":"Welcome to the test"}
+# recipients:      "account": "payoutrcpt12", "booked_total": 20000, "paid_total": 20000
+# funds:      "dues": "4.0000 TLOS", "deposited": "17.9000 TLOS"
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# error: Nothing to do
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "3.0000 TLOS"], ["payoutrcpt12", "3.0000 TLOS"], ["payoutrcpt13", "20.0000 TLOS"]]]' -p payoutpayer1
+# error: Insufficient funds on the deposit
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt12", "3.0000 TLOS"]]]' -p payoutpayer1
+# ok
+# funds:   "dues": "5.0000 TLOS",  "deposited": "17.9000 TLOS"
+# recipients:       "account": "payoutrcpt12", "booked_total": 30000, "paid_total": 20000
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# ok
+# transfer        {"from":"payoutengine","to":"payoutrcpt12","quantity":"1.0000 TLOS","memo":"Welcome to the test"}
+# recipients:     "account": "payoutrcpt12",  "booked_total": 30000, "paid_total": 30000
+# funds:     "dues": "4.0000 TLOS", "deposited": "16.9000 TLOS"
+
+
+
+
+
+
+
+
+
+
+ 

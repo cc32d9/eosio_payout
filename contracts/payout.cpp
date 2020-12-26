@@ -59,6 +59,7 @@ CONTRACT payout : public eosio::contract {
   ACTION approveacc(vector<name> accounts)
   {
     req_admin();
+    bool done_something = false;
     approvals appr(_self, 0);
     for( name& acc: accounts ) {
       auto itr = appr.find(acc.value);
@@ -67,14 +68,17 @@ CONTRACT payout : public eosio::contract {
         appr.modify( *itr, same_payer, [&]( auto& row ) {
                                          row.approved = 1;
                                        });
+        done_something = true;
       }
     }
+    check(done_something, "Nothing to do");
   }
 
 
   ACTION unapproveacc(vector<name> accounts)
   {
     req_admin();
+    bool done_something = false;
     approvals appr(_self, 0);
     for( name& acc: accounts ) {
       auto itr = appr.find(acc.value);
@@ -83,8 +87,10 @@ CONTRACT payout : public eosio::contract {
         appr.modify( *itr, same_payer, [&]( auto& row ) {
                                          row.approved = 0;
                                        });
+        done_something = true;
       }
     }
+    check(done_something, "Nothing to do");
   }
 
 
