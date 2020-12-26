@@ -265,7 +265,7 @@ CONTRACT payout : public eosio::contract {
         uint16_t walk_limit = MAX_WALK;
         bool will_pay = false;
         name pay_to;
-        
+
         while( !will_pay && walk_limit-- > 0 ) {
           if( rcitr == rcdidx.end() ) {
             // end of recpients list, abort the loop
@@ -448,6 +448,23 @@ CONTRACT payout : public eosio::contract {
     }
   }
 
+  void inc_uint_prop(name key)
+  {
+    props p(_self, 0);
+    auto itr = p.find(key.value);
+    if( itr != p.end() ) {
+      p.modify( *itr, same_payer, [&]( auto& row ) {
+                                    row.val_uint++;
+                                  });
+    }
+    else {
+      p.emplace(_self, [&]( auto& row ) {
+                         row.key = key;
+                         row.val_uint = 1;
+                       });
+    }
+  }
+
   // table recipients approval
 
   struct [[eosio::table("approvals")]] approval {
@@ -479,7 +496,7 @@ CONTRACT payout : public eosio::contract {
 
     auto primary_key()const { return schedule_name.value; }
     // index for iterating through active schedules
-    uint64_t by_dues()const { return (dues.amount > 0) ? payer.value:0; }
+    uint64_t by_dues()const { return (dues.amount > 0) ? schedule_name.value:0; }
   };
 
   typedef eosio::multi_index<
@@ -593,6 +610,8 @@ CONTRACT payout : public eosio::contract {
                                        row.dues -= due;
                                        row.deposited -= due;
                                      });
+
+    inc_uint_prop(name("paycount"));
   }
 
   // eosio.token structure

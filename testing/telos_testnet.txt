@@ -195,8 +195,29 @@ tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt11", "0.000200
 # ok
 
 tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# ok
+# transfer        {"from":"payoutengine","to":"payoutrcpt11","quantity":"0.00010000 PBTC","memo":"PBTC test"}
 
 
+### run multiple schedules
+
+tTcleos transfer payoutpayer2 payoutengine "20.0000 TLOS"
+# ok
+# funds: "deposited": "19.9000 TLOS", "deposited": "0.00975000 PBTC"
+
+
+tTcleos push action payoutengine book '["payer1sc1", [["payoutrcpt11", "3.0000 TLOS"], ["payoutrcpt12", "4.0000 TLOS"], ["payoutrcpt13", "3.0000 TLOS"]]]' -p payoutpayer1
+# ok
+
+tTcleos push action payoutengine book '["payer1sc2", [["payoutrcpt11", "0.0100 TLOS"], ["payoutrcpt12", "0.0100 TLOS"], ["payoutrcpt13", "0.0100 TLOS"], ["payoutrcpt14", "0.0100 TLOS"]]]' -p payoutpayer1
+# ok
+
+tTcleos push action payoutengine book '["payer2sc1", [["payoutrcpt11", "0.0010 TLOS"], ["payoutrcpt12", "0.0010 TLOS"], ["payoutrcpt13", "0.0010 TLOS"], ["payoutrcpt14", "0.0010 TLOS"]]]' -p payoutpayer2
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt12", "0.00010000 PBTC"], ["payoutrcpt13", "0.00010000 PBTC"], ["payoutrcpt14", "0.00010000 PBTC"]]]' -p payoutpayer2
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutrcpt11
+# ok
 
 
 
