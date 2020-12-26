@@ -338,7 +338,7 @@ CONTRACT payout : public eosio::contract {
       inc_revision();
     }
   }
-
+  /*
   // for testing purposes only!
   ACTION wipeall(uint16_t count)
   {
@@ -380,7 +380,7 @@ CONTRACT payout : public eosio::contract {
       }
     }
   }
-
+  */
  private:
 
   // properties table for keeping contract settings
