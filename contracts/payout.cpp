@@ -341,6 +341,22 @@ CONTRACT payout : public eosio::contract {
 
       scitr = sched.erase(scitr);
     }
+
+    {
+      approved_tbl appr(_self, 0);
+      auto itr = appr.begin();
+      while( itr != appr.end() ) {
+        itr = appr.erase(itr);
+      }
+    }
+    {
+      unapproved_tbl unappr(_self, 0);
+      auto itr = unappr.begin();
+      while( itr != unappr.end() ) {
+        itr = unappr.erase(itr);
+      }
+    }
+
   }
     
 
