@@ -72,6 +72,7 @@ CONTRACT payout : public eosio::contract {
       }
     }
     check(done_something, "Nothing to do");
+    inc_revision();
   }
 
 
@@ -91,6 +92,7 @@ CONTRACT payout : public eosio::contract {
       }
     }
     check(done_something, "Nothing to do");
+    inc_revision();
   }
 
 
@@ -137,6 +139,7 @@ CONTRACT payout : public eosio::contract {
                            row.dues = currency;
                            row.last_processed.value = 1; // the dues index position
                          });
+    inc_revision();
   }
 
 
@@ -207,6 +210,7 @@ CONTRACT payout : public eosio::contract {
     fnd.modify( *fnditr, same_payer, [&]( auto& row ) {
                                        row.dues += new_dues;
                                      });
+    inc_revision();
   }
 
 
@@ -232,7 +236,7 @@ CONTRACT payout : public eosio::contract {
     bool done_something = false;
     approvals appr(_self, 0);
 
-    uint16_t loopcount = 0;
+    uint16_t sched_loopcount = 0;
     bool paid_something_in_last_loop = false;
 
     while( count-- > 0 ) {
@@ -246,11 +250,11 @@ CONTRACT payout : public eosio::contract {
       if( scitr == schedidx.end() ) {
         // we're at the end of active schedules
         last_schedule.value = 0;
-        if( loopcount > 0 && !paid_something_in_last_loop ) {
+        if( sched_loopcount > 0 && !paid_something_in_last_loop ) {
           // nothing to do more, abort the loop
           count = 0;
         }
-        loopcount++;
+        sched_loopcount++;
         paid_something_in_last_loop = false;
       }
       else {
@@ -268,9 +272,9 @@ CONTRACT payout : public eosio::contract {
 
         while( !will_pay && walk_limit-- > 0 ) {
           if( rcitr == rcdidx.end() ) {
-            // end of recpients list, abort the loop
-            walk_limit = 0;
+            // end of recpients list
             last_processed = 1;
+            walk_limit = 0; //abort the loop
           }
           else {
             last_processed = rcitr->account.value;
@@ -331,6 +335,7 @@ CONTRACT payout : public eosio::contract {
       fnd.modify( *fnditr, same_payer, [&]( auto& row ) {
                                          row.deposited += quantity;
                                        });
+      inc_revision();
     }
   }
 
@@ -366,8 +371,15 @@ CONTRACT payout : public eosio::contract {
         itr = appr.erase(itr);
       }
     }
-  }
 
+    {
+      props p(_self, 0);
+      auto itr = p.begin();
+      while( itr != p.end() ) {
+        itr = p.erase(itr);
+      }
+    }
+  }
 
  private:
 
@@ -463,6 +475,10 @@ CONTRACT payout : public eosio::contract {
                          row.val_uint = 1;
                        });
     }
+  }
+
+  inline void inc_revision() {
+    inc_uint_prop(name("revision"));
   }
 
   // table recipients approval
@@ -610,8 +626,7 @@ CONTRACT payout : public eosio::contract {
                                        row.dues -= due;
                                        row.deposited -= due;
                                      });
-
-    inc_uint_prop(name("paycount"));
+    inc_revision();
   }
 
   // eosio.token structure

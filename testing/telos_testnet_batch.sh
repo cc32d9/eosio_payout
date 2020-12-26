@@ -3,16 +3,16 @@
 alias tTcleos='cleos -v -u https://testnet.persiantelos.com'
 
 
-tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer1
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc1", "eosio.token", "1.0000 TLOS", "welcome to payer1sc1"]' -p payoutpayer1
 sleep 2
 
-tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc2", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer1
+tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc2", "eosio.token", "1.0000 TLOS", "Welcome to payer1sc2"]' -p payoutpayer1
 sleep 2
 
-tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutpayer2
+tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc1", "eosio.token", "1.0000 TLOS", "Welcome to payer2sc1"]' -p payoutpayer2
 sleep 2
 
-tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc2", "btc.ptokens", "0.00000000 PBTC", "PBTC test"]' -p payoutpayer2
+tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc2", "btc.ptokens", "0.00000000 PBTC", "Welcome to payer2sc2"]' -p payoutpayer2
 sleep 2
 
 
@@ -42,7 +42,7 @@ tTcleos push action payoutengine approveacc '[["payoutrcpt11","payoutrcpt12","pa
 sleep 2
 
 
-tTcleos push action payoutengine runpayouts '[10]' -p payoutrcpt11
+tTcleos push action payoutengine runpayouts '[30]' -p payoutrcpt11
 sleep 2
 
 
