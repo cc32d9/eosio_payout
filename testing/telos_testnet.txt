@@ -40,10 +40,10 @@ tTcleos push action payoutengine setfee '["payoutfees11", "5"]' -p payoutadmin1
 
 
 tTcleos push action payoutengine approveacc '[["payoutrcpt14"]]' -p payoutadmin1
-# error: Account not found in unapproved list
+# error: Account not found in approval list
 
 tTcleos push action payoutengine unapproveacc '[["payoutrcpt14"]]' -p payoutadmin1
-# error: Account not found in approved list
+# error: Account not found in approval list
 
 tTcleos push action payoutengine newschedule '["payoutpayer1", "payer1sc1", "eosio.token", "1.0000 TLOS", "Welcome to the test"]' -p payoutadmin1
 # error: missing authority of payoutpayer1

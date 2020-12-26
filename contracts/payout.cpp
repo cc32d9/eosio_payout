@@ -226,6 +226,9 @@ CONTRACT payout : public eosio::contract {
     bool done_something = false;
     approvals appr(_self, 0);
 
+    uint16_t loopcount = 0;
+    bool paid_something_in_last_loop = false;
+    
     while( count-- > 0 ) {
       name last_schedule = get_name_prop(name("lastschedule"));
       name old_last_schedule = last_schedule;
@@ -237,9 +240,14 @@ CONTRACT payout : public eosio::contract {
       auto schedidx = sched.get_index<name("dues")>();
       auto scitr = schedidx.lower_bound(last_schedule.value);
       if( scitr == schedidx.end() ) {
-        // we're at the end of active schedules, abort the loop
-        count = 0;
+        // we're at the end of active schedules
         last_schedule.value = 1;
+        if( loopcount > 0 && !paid_something_in_last_loop ) {
+          // nothing to do more, abort the loop
+          count = 0;
+        }
+        loopcount++;
+        paid_something_in_last_loop = false;
       }
       else {
         name schedule_name = scitr->schedule_name;
@@ -265,6 +273,7 @@ CONTRACT payout : public eosio::contract {
             if( apritr->approved ) {
               _pay_due(schedule_name, rcitr->account);
               paid = true;
+              paid_something_in_last_loop = true;
             }
             else {
               // this is an unapproved account, skip to the next
