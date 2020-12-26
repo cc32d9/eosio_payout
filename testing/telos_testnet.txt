@@ -144,6 +144,61 @@ tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
 # funds:     "dues": "4.0000 TLOS", "deposited": "16.9000 TLOS"
 
 
+tTcleos push action payoutengine approveacc '[["payoutrcpt11","payoutrcpt12","payoutrcpt13"]]' -p payoutadmin1
+# ok
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+# ok
+# transfer        {"from":"payoutengine","to":"payoutrcpt11","quantity":"2.0000 TLOS","memo":"Welcome to the test"}
+# transfer        {"from":"payoutengine","to":"payoutrcpt13","quantity":"2.0000 TLOS","memo":"Welcome to the test"}
+# recipienns: all paid
+# funds:     "dues": "0.0000 TLOS", "deposited": "12.9000 TLOS"
+
+
+# RAM tests with additional token
+# quota:     701.4 KiB    used:     499.9 KiB
+
+tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc2", "btc.ptokens", "0.0000 PBTC", "PBTC test"]' -p payoutpayer2
+# error: Wrong currency precision
+
+tTcleos push action payoutengine newschedule '["payoutpayer2", "payer2sc2", "btc.ptokens", "0.00000000 PBTC", "PBTC test"]' -p payoutpayer2
+# ok
+# RAM unchanged
+
+tTcleos push action btc.ptokens transfer '["payoutpayer2", "payoutengine", "0.01000000 PBTC", "Deposit"]' -p payoutpayer2
+# ok
+# quota:     701.4 KiB    used:     500.3 KiB
+
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt11", "3.0000 TLOS"]]]' -p payoutpayer2
+# error Invalid currency symbol
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt11", "3.0000 PBTC"]]]' -p payoutpayer2
+# error Invalid currency symbol
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt11", "3.00000000 PBTC"]]]' -p payoutpayer2
+# error Insufficient funds on the deposit
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt11", "0.00010000 PBTC"]]]' -p payoutpayer2
+# ok
+
+tTcleos push action payoutengine claim '["payer2sc2", "payoutrcpt11"]' -p payoutpayer2
+# ok
+# transfer        {"from":"payoutengine","to":"payoutrcpt11","quantity":"0.00010000 PBTC","memo":"PBTC test"}
+# quota:     701.4 KiB    used:     500.5 KiB
+
+tTcleos push action payoutengine claim '["payer2sc2", "payoutrcpt11"]' -p payoutpayer2
+# error: All dues are paid already
+
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt11", "0.00020000 PBTC"]]]' -p payoutpayer2
+# ok
+
+tTcleos push action payoutengine runpayouts '[10]' -p payoutpayer2
+
+
+
+
 
 
 

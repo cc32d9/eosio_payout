@@ -111,7 +111,7 @@ CONTRACT payout : public eosio::contract {
       check(statsitr != statstbl.end(), "This currency symbol does not exist");
       check(statsitr->supply.symbol.precision() == currency.symbol.precision(), "Wrong currency precision");
     }
-                           
+
     currency.amount = 0;
 
     funds fnd(_self, payer.value);
@@ -196,7 +196,7 @@ CONTRACT payout : public eosio::contract {
     funds fnd(_self, payer.value);
     auto fndidx = fnd.get_index<name("token")>();
     auto fnditr = fndidx.find(token_index_val(scitr->tkcontract, scitr->currency));
-    check(fnditr != fndidx.end(), "This must never happen");
+    check(fnditr != fndidx.end(), "This must never happen 1");
 
     check(fnditr->deposited >= fnditr->dues + new_dues, "Insufficient funds on the deposit");
 
@@ -234,20 +234,18 @@ CONTRACT payout : public eosio::contract {
 
     uint16_t loopcount = 0;
     bool paid_something_in_last_loop = false;
-    
+
     while( count-- > 0 ) {
       name last_schedule = get_name_prop(name("lastschedule"));
       name old_last_schedule = last_schedule;
-      if( last_schedule.value == 0 ) {
-        last_schedule.value = 1;
-      }
+      last_schedule.value++;
 
       schedules sched(_self, 0);
       auto schedidx = sched.get_index<name("dues")>();
       auto scitr = schedidx.lower_bound(last_schedule.value);
       if( scitr == schedidx.end() ) {
         // we're at the end of active schedules
-        last_schedule.value = 1;
+        last_schedule.value = 0;
         if( loopcount > 0 && !paid_something_in_last_loop ) {
           // nothing to do more, abort the loop
           count = 0;
@@ -265,8 +263,10 @@ CONTRACT payout : public eosio::contract {
         auto rcitr = rcdidx.lower_bound(last_processed);
 
         uint16_t walk_limit = MAX_WALK;
-        bool paid = false;
-        while( !paid && walk_limit-- > 0 ) {
+        bool will_pay = false;
+        name pay_to;
+        
+        while( !will_pay && walk_limit-- > 0 ) {
           if( rcitr == rcdidx.end() ) {
             // end of recpients list, abort the loop
             walk_limit = 0;
@@ -275,11 +275,10 @@ CONTRACT payout : public eosio::contract {
           else {
             last_processed = rcitr->account.value;
             auto apritr = appr.find(rcitr->account.value);
-            check(apritr != appr.end(), "This should never happen");
+            check(apritr != appr.end(), "This should never happen 2");
             if( apritr->approved ) {
-              _pay_due(schedule_name, rcitr->account);
-              paid = true;
-              paid_something_in_last_loop = true;
+              will_pay = true;
+              pay_to = rcitr->account;
             }
             else {
               // this is an unapproved account, skip to the next
@@ -293,6 +292,12 @@ CONTRACT payout : public eosio::contract {
                                               row.last_processed.value = last_processed;
                                             });
           done_something = true;
+        }
+
+        // _pay_due modifies the same table outside of this index, so we execute it last.
+        if( will_pay ) {
+          _pay_due(schedule_name, pay_to);
+          paid_something_in_last_loop = true;
         }
       }
 
@@ -338,7 +343,7 @@ CONTRACT payout : public eosio::contract {
     auto scitr = sched.begin();
 
     while( scitr != sched.end() && count-- > 0 ) {
-      
+
       funds fnd(_self, scitr->payer.value);
       auto fnditr = fnd.begin();
       while( fnditr != fnd.end() ) {
@@ -362,7 +367,7 @@ CONTRACT payout : public eosio::contract {
       }
     }
   }
-    
+
 
  private:
 
@@ -448,7 +453,7 @@ CONTRACT payout : public eosio::contract {
   struct [[eosio::table("approvals")]] approval {
     name           account;
     uint8_t        approved;
-    
+
     auto primary_key()const { return account.value; }
     uint64_t by_approved()const { return approved ? account.value:0; }
     uint64_t by_unapproved()const { return (!approved) ? account.value:0; }
@@ -562,11 +567,12 @@ CONTRACT payout : public eosio::contract {
   void _pay_due(name schedule_name, name recipient) {
     schedules sched(_self, 0);
     auto scitr = sched.find(schedule_name.value);
+    check(scitr != sched.end(), "This must never happen 3");
 
     funds fnd(_self, scitr->payer.value);
     auto fndidx = fnd.get_index<name("token")>();
     auto fnditr = fndidx.find(token_index_val(scitr->tkcontract, scitr->currency));
-    check(fnditr != fndidx.end(), "This must never happen");
+    check(fnditr != fndidx.end(), "This must never happen 4");
 
     recipients rcpts(_self, schedule_name.value);
     auto rcitr = rcpts.find(recipient.value);
