@@ -59,17 +59,15 @@ CONTRACT payout : public eosio::contract {
   ACTION approveacc(vector<name> accounts)
   {
     req_admin();
-
-    approved_tbl appr(_self, 0);
-    unapproved_tbl unappr(_self, 0);
-
+    approvals appr(_self, 0);
     for( name& acc: accounts ) {
-      auto itr = unappr.find(acc.value);
-      check(itr != unappr.end(), "Account not found in unapproved list");
-      appr.emplace(_self, [&]( auto& row ) {
-                            row.account = acc;
-                          });
-      unappr.erase(itr);
+      auto itr = appr.find(acc.value);
+      check(itr != appr.end(), "Account not found in approval list");
+      if( !itr->approved ) {
+        appr.modify( *itr, same_payer, [&]( auto& row ) {
+                                         row.approved = 1;
+                                       });
+      }
     }
   }
 
@@ -77,17 +75,15 @@ CONTRACT payout : public eosio::contract {
   ACTION unapproveacc(vector<name> accounts)
   {
     req_admin();
-
-    approved_tbl appr(_self, 0);
-    unapproved_tbl unappr(_self, 0);
-
+    approvals appr(_self, 0);
     for( name& acc: accounts ) {
       auto itr = appr.find(acc.value);
-      check(itr != appr.end(), "Account not found in approved list");
-      unappr.emplace(_self, [&]( auto& row ) {
-                              row.account = acc;
-                            });
-      appr.erase(itr);
+      check(itr != appr.end(), "Account not found in approval list");
+      if( itr->approved ) {
+        appr.modify( *itr, same_payer, [&]( auto& row ) {
+                                         row.approved = 0;
+                                       });
+      }
     }
   }
 
@@ -155,9 +151,7 @@ CONTRACT payout : public eosio::contract {
     require_auth(payer);
 
     asset new_dues = scitr->currency;
-
-    approved_tbl appr(_self, 0);
-    unapproved_tbl unappr(_self, 0);
+    approvals appr(_self, 0);
 
     recipients rcpts(_self, schedule_name.value);
     for( auto& rec: records ) {
@@ -167,6 +161,7 @@ CONTRACT payout : public eosio::contract {
 
       if( rcitr == rcpts.end() ) {
         // register a new recipient
+        check(is_account(rec.recipient), "recipient account does not exist");
         new_dues += rec.new_total;
         rcpts.emplace(payer, [&]( auto& row ) {
                                row.account = rec.recipient;
@@ -175,10 +170,10 @@ CONTRACT payout : public eosio::contract {
                              });
 
         // new recipients go to unapproved list unless approved in another schedule
-        if( appr.find(rec.recipient.value) == appr.end() &&
-            unappr.find(rec.recipient.value) == unappr.end() ) {
-          unappr.emplace(payer, [&]( auto& row ) {
+        if( appr.find(rec.recipient.value) == appr.end() ) {
+            appr.emplace(payer, [&]( auto& row ) {
                                   row.account = rec.recipient;
+                                  row.approved = 0;
                                 });
         }
       }
@@ -229,7 +224,7 @@ CONTRACT payout : public eosio::contract {
   ACTION runpayouts(uint16_t count)
   {
     bool done_something = false;
-    unapproved_tbl unappr(_self, 0);
+    approvals appr(_self, 0);
 
     while( count-- > 0 ) {
       name last_schedule = get_name_prop(name("lastschedule"));
@@ -265,13 +260,15 @@ CONTRACT payout : public eosio::contract {
           }
           else {
             last_processed = rcitr->account.value;
-            if( unappr.find(rcitr->account.value) != unappr.end() ) {
-              // this is an unapproved account, skip to the next
-              rcitr++;
-            }
-            else {
+            auto apritr = appr.find(rcitr->account.value);
+            check(apritr != appr.end(), "This should never happen");
+            if( apritr->approved ) {
               _pay_due(schedule_name, rcitr->account);
               paid = true;
+            }
+            else {
+              // this is an unapproved account, skip to the next
+              rcitr++;
             }
           }
         }
@@ -343,20 +340,12 @@ CONTRACT payout : public eosio::contract {
     }
 
     {
-      approved_tbl appr(_self, 0);
+      approvals appr(_self, 0);
       auto itr = appr.begin();
       while( itr != appr.end() ) {
         itr = appr.erase(itr);
       }
     }
-    {
-      unapproved_tbl unappr(_self, 0);
-      auto itr = unappr.begin();
-      while( itr != unappr.end() ) {
-        itr = unappr.erase(itr);
-      }
-    }
-
   }
     
 
@@ -439,23 +428,23 @@ CONTRACT payout : public eosio::contract {
     }
   }
 
-  // tables for approved and unapproved recipients
+  // table recipients approval
 
-  struct [[eosio::table("approved")]] approved {
+  struct [[eosio::table("approvals")]] approval {
     name           account;
+    uint8_t        approved;
+    
     auto primary_key()const { return account.value; }
+    uint64_t by_approved()const { return approved ? account.value:0; }
+    uint64_t by_unapproved()const { return (!approved) ? account.value:0; }
   };
 
   typedef eosio::multi_index<
-    name("approved"), approved> approved_tbl;
+    name("approvals"), approval,
+    indexed_by<name("approved"), const_mem_fun<approval, uint64_t, &approval::by_approved>>,
+    indexed_by<name("unapproved"), const_mem_fun<approval, uint64_t, &approval::by_unapproved>>
+    > approvals;
 
-  struct [[eosio::table("unapproved")]] unapproved {
-    name           account;
-    auto primary_key()const { return account.value; }
-  };
-
-  typedef eosio::multi_index<
-    name("unapproved"), unapproved> unapproved_tbl;
 
 
   // all registered schedules
