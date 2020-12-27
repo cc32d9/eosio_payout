@@ -1,0 +1,19 @@
+{
+    "name": "payout_server",
+    "version": "0.0.1",
+    "description": "Server-side daemon for EOSIO Payout Engine",
+    "license": "Apache-2.0",
+    "author": {
+        "name": "cc32d9 | EOS Amsterdam",
+        "url": "https://github.com/cc32d9"
+    },
+    "engines": {
+        "node": ">= 12.0.0"
+    },
+    "main": "payout_server.js",
+    "dependencies": {
+        "config": ">=3.3.3",
+        "node-fetch": ">= 2.6.0",
+        "eosjs": ">=20.0.0"
+    }
+}
