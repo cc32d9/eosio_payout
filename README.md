@@ -8,6 +8,9 @@ dropped by a microfork.
 The Payout Engine solves this problem. Whenever there's a failure, it
 guarantees to retry and never double-spend.
 
+The engine is available for any project that needs to automate
+payments, such as e-commerce, dividends, salary, etc.
+
 The engine consists of the following components:
 
 * The payout smart contract that registers the bookings and keeps
@@ -95,6 +98,12 @@ The automatic payouts are performed in round-robin sequence: one due
 payment from a schedule is sent, then the next schedule is
 selected. This guarantees that a massive schedule does not block the
 less frequent ones.
+
+The payer's RAM qupta is charged for creating all memory structures
+related to the schedule. Currently the contract allocates the RAM for
+recipient token balances if the recipient didn't have such token, but
+it will change in the future, and the payer will be charged for such
+expenses.
 
 
 ## Production deployment
