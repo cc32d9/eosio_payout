@@ -37,7 +37,9 @@ const timer_check_dues = config.get('timer.check_dues');
 const timer_check_dues_followup = config.get('timer.check_dues_followup');
 const timer_check_unapproved = config.get('timer.check_unapproved');
 const timer_check_approved = config.get('timer.check_approved');
+
 const timer_recheck_hash = config.get('timer.recheck_hash');
+const timer_push_approved_list = config.get('timer.push_approved_list');
 
 
 const sigProvider = new JsSignatureProvider([adminkey]);
@@ -48,12 +50,12 @@ const api = new Api({rpc: rpc, signatureProvider: sigProvider,
 
 var last_revision = 0;
 var has_code_map = new Map();
-
+var approved_list = new Array();
 
 setInterval(check_dues, timer_check_dues);
 setInterval(check_unapproved, timer_check_unapproved);
 setInterval(check_approved, timer_check_approved);
-
+setInterval(push_approved_list, timer_push_approved_list);
 
 
 
@@ -82,44 +84,40 @@ async function check_dues() {
 async function check_unapproved() {
     console.log("check_unapproved() started");
     let now = new Date();    
-    let accounts = await fetch_approved(false);
-    let clean = new Array();
-    for( const acc of accounts ) {
+    fetch_approved(false, async function (acc) {
         if( !has_code_map.has(acc) || now >= has_code_map.get(acc) + timer_recheck_hash ) {
             let hc = await has_code(acc);
             if( !hc ) {
-                clean.push(acc);
+                approved_list.push(acc);
             }
             else {
                 has_code_map.set(acc, now);
             }
         }
-    }
+    });
+}
 
-    if( clean.length > 0 ) {
-        console.log("check_unapproved(): approving " + clean.length + " accounts");
+
+async function push_approved_list() {
+    if( approved_list.length > 0 ) {
+        let clean = approved_list.slice(0, approvals_limit);
+        approved_list.splice(0, approvals_limit);   
+        console.log("approving " + clean.length + " accounts");
         await approve(true, clean);
     }
 }
 
+
 async function check_approved() {
     console.log("check_approved() started");
     let now = new Date();    
-    let accounts = await fetch_approved(true);
-    let unclean = new Array();
-    for( const acc of accounts ) {
+    fetch_approved(true, async function (acc) {
         let hc = await has_code(acc);
         if( hc ) {
-            unclean.push(acc);
             has_code_map.set(acc, now);
+            approve(false, [acc]);
         }
-    }
-
-    if( unclean.length > 0 ) {
-        console.log("check_approved(): unapproving " + unclean.length + " accounts");
-        await approve(false, unclean);
-    }
-
+    });
 }
 
 
@@ -171,7 +169,6 @@ async function get_revision() {
 
 async function runpayouts() {
     try {
-        console.info('calling runpayouts');
         const result = await api.transact(
             {
                 actions:
@@ -193,14 +190,14 @@ async function runpayouts() {
                 expireSeconds: 60
             }
         );
-        console.info('transaction ID: ', result.transaction_id);
+        console.info('runpayouts transaction ID: ', result.transaction_id);
     } catch (e) {
         console.error('ERROR: ' + e);
     }
 }
 
 
-async function fetch_approved(check_approved, idx_low=1) {
+async function fetch_approved(check_approved, callback, idx_low=1) {
     let response = await fetch(url + '/v1/chain/get_table_rows', {
         method: 'post',
         body:    JSON.stringify({
@@ -216,18 +213,15 @@ async function fetch_approved(check_approved, idx_low=1) {
     });
 
     let data = await response.json();
-    let ret = new Array();
     data.rows.forEach(function(row) {
-        if( ret.length < approvals_limit ) {
-            ret.push(row.account);
-        }
+        callback(row.account);
     });
     
-    if( data.more && ret.length < approvals_limit ) {
-        return ret.concat( fetch_approved(check_approved, data.next_key) );
+    if( data.more ) {
+        return fetch_approved(check_approved, callback, data.next_key);
     }
     
-    return ret;
+    return;
 }
 
 
@@ -255,7 +249,6 @@ async function has_code(acc) {
 async function approve(do_approve, accounts) {
     try {
         let action = do_approve ? 'approveacc':'unapproveacc';
-        console.info('calling ' + action);
         const result = await api.transact(
             {
                 actions:
@@ -277,7 +270,7 @@ async function approve(do_approve, accounts) {
                 expireSeconds: 60
             }
         );
-        console.info('transaction ID: ', result.transaction_id);
+        console.info(action + '{' + accounts.length + '} transaction ID: ', result.transaction_id);
     } catch (e) {
         console.error('ERROR: ' + e);
     }
