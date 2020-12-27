@@ -100,6 +100,7 @@ CONTRACT payout : public eosio::contract {
   {
     require_auth(payer);
 
+    check(schedule_name != name(""), "Schedule name cannot be empty");
     schedules sched(_self, 0);
     auto scitr = sched.find(schedule_name.value);
     check(scitr == sched.end(), "A schedule with this name already exists");
