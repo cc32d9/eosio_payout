@@ -289,14 +289,14 @@ CONTRACT payout : public eosio::contract {
       if( scitr == schedidx.end() ) {
         // we're at the end of active schedules
         last_schedule.value = 0;
-        if( sched_loopcount > 0 && !paid_something_in_last_loop ) {
+        if( sched_loopcount > 1 && !paid_something_in_last_loop ) {
           // nothing to do more, abort the loop
           count = 0;
         }
         sched_loopcount++;
-        paid_something_in_last_loop = false;
       }
       else {
+        paid_something_in_last_loop = false;
         name schedule_name = scitr->schedule_name;
         last_schedule = schedule_name;
         uint64_t last_processed = scitr->last_processed.value;
