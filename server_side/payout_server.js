@@ -60,10 +60,10 @@ setInterval(push_approved_list, timer_push_approved_list);
 
 
 async function check_dues() {
-    console.log("check_dues() started");
+    // console.log("check_dues() started");
 
     if( await has_open_dues() ) {
-        console.log("due payments found");
+        // console.log("due payments found");
         let new_revision = await get_revision();
         if( new_revision != last_revision ) {
             console.log("found an updated revision: " + new_revision);
@@ -72,17 +72,17 @@ async function check_dues() {
             setTimeout(check_dues, timer_check_dues_followup);
         }
         else {
-            console.log("revision has not updated");
+            // console.log("revision has not updated");
         }
     }
     else {
-        console.log("no due payments found");
+        // console.log("no due payments found");
     }
 }
 
 
 async function check_unapproved() {
-    console.log("check_unapproved() started");
+    // console.log("check_unapproved() started");
     let now = new Date();    
     fetch_approved(false, async function (acc) {
         if( !has_code_map.has(acc) || now >= has_code_map.get(acc) + timer_recheck_hash ) {
@@ -109,7 +109,7 @@ async function push_approved_list() {
 
 
 async function check_approved() {
-    console.log("check_approved() started");
+    // console.log("check_approved() started");
     let now = new Date();    
     fetch_approved(true, async function (acc) {
         let hc = await has_code(acc);
