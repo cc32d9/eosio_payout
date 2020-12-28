@@ -110,6 +110,8 @@ expenses.
 
 The account `payoutengine` is deployed on the following EOSIO blockchains:
 
+* EOS Mainnet
+
 * Telos Testnet
 
 * WAX Testnet
