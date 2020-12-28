@@ -112,6 +112,12 @@ The account `payoutengine` is deployed on the following EOSIO blockchains:
 
 * EOS Mainnet
 
+* Telos Mainnet
+
+* WAX Mainnet
+
+* Jungle Testnet
+
 * Telos Testnet
 
 * WAX Testnet
