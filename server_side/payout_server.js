@@ -33,6 +33,7 @@ const adminkey   = config.get('adminkey');
 const runpayouts_limit = config.get('limit.runpayouts');
 const approvals_limit = config.get('limit.approvals');
 
+const timer_keepalive = config.get('timer.keepalive');
 const timer_check_dues = config.get('timer.check_dues');
 const timer_check_dues_followup = config.get('timer.check_dues_followup');
 const timer_check_unapproved = config.get('timer.check_unapproved');
@@ -52,11 +53,16 @@ var last_revision = 0;
 var has_code_map = new Map();
 var approved_list = new Array();
 
+setInterval(keepaalive, timer_keepalive);
 setInterval(check_dues, timer_check_dues);
 setInterval(check_unapproved, timer_check_unapproved);
 setInterval(check_approved, timer_check_approved);
 setInterval(push_approved_list, timer_push_approved_list);
 
+
+async function keepaalive() {
+    console.log('keepalive');
+}
 
 
 async function check_dues() {
