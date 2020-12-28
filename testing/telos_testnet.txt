@@ -220,6 +220,12 @@ tTcleos push action payoutengine runpayouts '[10]' -p payoutrcpt11
 # ok
 
 
+tTcleos push action payoutengine bookm '["payer2sc2", [["payoutrcpt12", "0.00031000 PBTC", "hello1"], ["payoutrcpt13", "0.00031000 PBTC", "hello2"], ["payoutrcpt14", "0.00031000 PBTC", "hello3"]]]' -p payoutpayer2
+
+tTcleos push action payoutengine book '["payer2sc2", [["payoutrcpt12", "0.00040000 PBTC"], ["payoutrcpt13", "0.00040000 PBTC"], ["payoutrcpt14", "0.00040000 PBTC"]]]' -p payoutpayer2
+
+
+
 
 
 

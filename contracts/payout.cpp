@@ -215,6 +215,44 @@ CONTRACT payout : public eosio::contract {
   }
 
 
+  struct bookm_record {
+    name  recipient;
+    asset new_total;
+    string memo;
+  };
+
+  ACTION bookm(name schedule_name, vector<bookm_record> records)
+  {
+    vector<book_record> newrecords;
+    for( auto& rec: records ) {
+      newrecords.push_back({.recipient = rec.recipient, .new_total = rec.new_total});
+    }
+
+    book(schedule_name, newrecords);
+
+    schedules sched(_self, 0);
+    auto scitr = sched.find(schedule_name.value);
+    check(scitr != sched.end(), "This must never happen 5");
+    name payer = scitr->payer;
+
+    memos memtbl(_self, schedule_name.value);
+    for( auto& rec: records ) {
+      auto memitr = memtbl.find(rec.recipient.value);
+      if( memitr == memtbl.end() ) {
+        memtbl.emplace(payer, [&]( auto& row ) {
+                                row.account = rec.recipient;
+                                row.memo = rec.memo;
+                              });
+      }
+      else {
+        memtbl.modify( *memitr, payer, [&]( auto& row ) {
+                                         row.memo = rec.memo;
+                                       });
+      }
+    }
+  }
+
+
   // recipient can claim the transfer instead of waiting for automatic job (no authorization needed)
   ACTION claim(name schedule_name, name recipient)
   {
@@ -562,6 +600,18 @@ CONTRACT payout : public eosio::contract {
     > recipients;
 
 
+  // optional transfer memos for recipients. scope=schedule
+  struct [[eosio::table("memos")]] memo {
+    name           account;
+    string         memo;
+
+    auto primary_key()const { return account.value; }
+  };
+
+  typedef eosio::multi_index<name("memos"), memo> memos;
+
+
+
   void req_admin()
   {
     name admin = get_name_prop(name("adminacc"));
@@ -611,9 +661,20 @@ CONTRACT payout : public eosio::contract {
     recipients rcpts(_self, schedule_name.value);
     auto rcitr = rcpts.find(recipient.value);
 
+    string memo;
+    memos memtbl(_self, schedule_name.value);
+    auto memitr = memtbl.find(recipient.value);
+    if( memitr == memtbl.end() ) {
+      memo = scitr->memo;
+    }
+    else {
+      memo = memitr->memo;
+      memtbl.erase(memitr);
+    }
+
     asset due(rcitr->booked_total - rcitr->paid_total, scitr->currency.symbol);
     extended_asset pay(due, scitr->tkcontract);
-    send_payment(recipient, pay, scitr->memo);
+    send_payment(recipient, pay, memo);
 
     rcpts.modify( *rcitr, same_payer, [&]( auto& row ) {
                                         row.paid_total = row.booked_total;
