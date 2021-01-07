@@ -163,7 +163,9 @@ CONTRACT payout : public eosio::contract {
     asset new_dues = scitr->currency;
     approvals appr(_self, 0);
 
+    bool done_something = false;
     recipients rcpts(_self, schedule_name.value);
+
     for( auto& rec: records ) {
 
       check(rec.new_total.symbol == scitr->currency.symbol, "Invalid currency symbol");
@@ -186,16 +188,20 @@ CONTRACT payout : public eosio::contract {
                                   row.approved = 0;
                                 });
         }
+
+        done_something = true;
       }
-      else {
-        // update an existing recipient
-        check(rec.new_total.amount > rcitr->booked_total, "New total must be bigger than the old total");
+      else if( rec.new_total.amount > rcitr->booked_total ) {
+        // update an existing recipient if the new_total is higher than before
         new_dues.amount += (rec.new_total.amount - rcitr->booked_total);
         rcpts.modify( *rcitr, same_payer, [&]( auto& row ) {
                                             row.booked_total = rec.new_total.amount;
                                           });
+        done_something = true;
       }
     }
+
+    check(done_something, "No totals were updated");
 
     funds fnd(_self, payer.value);
     auto fndidx = fnd.get_index<name("token")>();
@@ -244,7 +250,7 @@ CONTRACT payout : public eosio::contract {
                                 row.memo = rec.memo;
                               });
       }
-      else {
+      else if( memitr->memo != rec.memo ) {
         memtbl.modify( *memitr, payer, [&]( auto& row ) {
                                          row.memo = rec.memo;
                                        });
