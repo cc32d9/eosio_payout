@@ -130,7 +130,8 @@ among well-known organizations.
 
 ## Smart contract actions and tables
 
-The following actions are available for users:
+Only actions and tables for user calling are listed below.
+
 
 ### action: `newschedule`
 
@@ -217,7 +218,7 @@ automatic outgoing payments. Such recipients can initiate the transfer
 by calling the `claim` action. There is no authorization, so any
 account can call it to start the transfer for another recipient.
 
-recopients can also call this to speed up the outgoing transfers if
+Recipients can also call this to speed up the outgoing transfers if
 the automatic dispatcher is too busy.
 
 ```
@@ -262,12 +263,12 @@ due amount for a recipient, it's time to execute the `book` action.
 ### table: `funds`
 
 This table is useful for monitoring the remaining token balance for a
-payer. Scope is set to the payer account, and th eprimary key is a
+payer. Scope is set to the payer account, and the primary key is a
 running integer.
 
-`deposited` indicates the available funds. It's decreased every tme an
-outgoing payment is made from corresponding payer and in corresponding
-currency.
+`deposited` indicates the available funds. It's decreased every time
+an outgoing payment is made from corresponding payer and in
+corresponding currency.
 
 `dues` indicates the amount that is booked to be sent out to
 recipients.
