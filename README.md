@@ -99,7 +99,7 @@ payment from a schedule is sent, then the next schedule is
 selected. This guarantees that a massive schedule does not block the
 less frequent ones.
 
-The payer's RAM qupta is charged for creating all memory structures
+The payer's RAM quota is charged for creating all memory structures
 related to the schedule. Currently the contract allocates the RAM for
 recipient token balances if the recipient didn't have such token, but
 it will change in the future, and the payer will be charged for such
@@ -126,6 +126,171 @@ The account `payoutengine` is deployed on the following EOSIO blockchains:
 For the time being, the contract is managed by `cc32dninexxx`
 account. Later on, the management will be transferred to a multisig
 among well-known organizations.
+
+
+## Smart contract actions and tables
+
+The following actions are available for users:
+
+### action: `newschedule`
+
+The action is called once to initiate a schedule. The payer is charged for RAM.
+
+```
+ACTION newschedule(name payer, name schedule_name, name tkcontract, asset currency, string memo)
+```
+
+* `payer`: the account that creates a new schedule, and this account will be a designated payer for it.
+
+* `schedule_name`: a unique name for the schedule. Letters `a-z`,
+  numbers `1-5` and dots (`.`) are allowed, up to 12 characters.
+
+* `tkcontract`: token contract (e.g. `eosio.token` for the system
+  token).
+
+* `currency`: token symbol and precision (e.g. `0.0000 EOS`).
+
+* `memo`: a string up to 256 characters long that will be used as
+  default memo string in outbound token transfers.
+
+
+### transfer handler
+
+Normal token transfers are accepted by contract. it only accepts them
+from payers which have registered schedules, and only in the token
+currency that is specified in a schedule. The deposited token can be
+spent by calling `book` or `bookm` actions.
+
+
+### action: `book`
+
+The action books new due amounts toward recipients for a specific
+schedule. Only the payer registered with the schedule is allowed to
+execute it. At least one amount should be higher than a previously
+booked total for a given recipient. It is recommended to look up
+`booked_total` in `recipients` table for a particular recipient, and
+only send the `book` action if the new due amount is higher than
+`booked_total`.
+
+```
+  struct book_record {
+    name  recipient;
+    asset new_total;
+  };
+
+  ACTION book(name schedule_name, vector<book_record> records)
+```
+
+* `schedule_name`: a schedule name previously registered with
+  `newschedule`.
+
+* `records`: a vector of structures with the following fields:
+
+  * `recipient`: a valid EOSIO account that will receive the payment;
+
+  * `new_total`: total amount of token that the recipient should
+    receive throughout its lifetime (so this amount should only grow
+    with each action call).
+
+
+### action: `bookm`
+
+The action is similar to `book`, but the structures have an additional
+field, `memo`, which specifies the message that will be used in
+outgoing transfer for this recipient.
+
+```
+  struct bookm_record {
+    name  recipient;
+    asset new_total;
+    string memo;
+  };
+
+  ACTION bookm(name schedule_name, vector<bookm_record> records)
+```
+
+
+### action: `claim`
+
+Accounts that have smart contracts are by default blocked from
+automatic outgoing payments. Such recipients can initiate the transfer
+by calling the `claim` action. There is no authorization, so any
+account can call it to start the transfer for another recipient.
+
+recopients can also call this to speed up the outgoing transfers if
+the automatic dispatcher is too busy.
+
+```
+  ACTION claim(name schedule_name, name recipient)
+```
+
+* `schedule_name`: a valid schedule name;
+
+* `recipient`: the recipient account that will receive a payment if
+  there is an outstanding due amount,
+
+
+### table: `recipients`
+
+This table is the only one that payer needs to look up in order to
+optimize the bookings. The scope is set to the schedule name, and
+recipient name is the primary index. `booked_total` is an integer, so
+it's the currency amount multiplied by a power of 10 corresponding to
+the token precision.
+
+Once the payer recognizes that `booked_total` is lower than the total
+due amount for a recipient, it's time to execute the `book` action.
+
+```
+  // payment recipients, scope=scheme_name
+  struct [[eosio::table("recipients")]] recipient {
+    name           account;
+    uint64_t       booked_total; // asset amount
+    uint64_t       paid_total;
+
+    auto primary_key()const { return account.value; }
+    // index for iterating through open dues
+    uint64_t by_dues()const { return (booked_total > paid_total) ? account.value:0; }
+  };
+
+  typedef eosio::multi_index<
+    name("recipients"), recipient,
+    indexed_by<name("dues"), const_mem_fun<recipient, uint64_t, &recipient::by_dues>>
+    > recipients;
+```
+
+### table: `funds`
+
+This table is useful for monitoring the remaining token balance for a
+payer. Scope is set to the payer account, and th eprimary key is a
+running integer.
+
+`deposited` indicates the available funds. It's decreased every tme an
+outgoing payment is made from corresponding payer and in corresponding
+currency.
+
+`dues` indicates the amount that is booked to be sent out to
+recipients.
+
+```
+  // assets belonging to the payer. scope=payer
+  struct [[eosio::table("funds")]] fundsrow {
+    uint64_t       id;
+    name           tkcontract;
+    asset          currency;
+    asset          dues;  // how much we need to send to recipients
+    asset          deposited; // how much we can spend
+
+    auto primary_key()const { return id; }
+    uint128_t by_token()const { return token_index_val(tkcontract, currency); }
+  };
+
+  typedef eosio::multi_index<
+    name("funds"), fundsrow,
+    indexed_by<name("token"), const_mem_fun<fundsrow, uint128_t, &fundsrow::by_token>>
+    > funds;
+```
+
 
 
 
