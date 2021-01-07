@@ -48,6 +48,8 @@ const rpc = new JsonRpc(url, { fetch });
 const api = new Api({rpc: rpc, signatureProvider: sigProvider,
                      textDecoder: new TextDecoder(), textEncoder: new TextEncoder()});
 
+console.log("Started payout server using " + url);
+//console.log(config.util.getConfigSources());
 
 var last_revision = 0;
 var has_code_map = new Map();
