@@ -107,6 +107,8 @@ CONTRACT payout : public eosio::contract {
     check(is_account(tkcontract), "Token contract account does not exist");
     check(currency.is_valid(), "invalid currency" );
 
+    check(memo.size() <= 256, "memo has more than 256 bytes");
+
     // validate that such token exists
     {
       stats_table statstbl(tkcontract, currency.symbol.code().raw());
@@ -243,6 +245,7 @@ CONTRACT payout : public eosio::contract {
 
     memos memtbl(_self, schedule_name.value);
     for( auto& rec: records ) {
+      check(rec.memo.size() <= 256, "memo has more than 256 bytes");
       auto memitr = memtbl.find(rec.recipient.value);
       if( memitr == memtbl.end() ) {
         memtbl.emplace(payer, [&]( auto& row ) {
