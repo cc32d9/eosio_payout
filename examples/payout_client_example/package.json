@@ -1,5 +1,5 @@
 {
-    "name": "ponypayer_example",
+    "name": "payer_example",
     "version": "0.0.1",
     "description": "Example payer script for EOSIO Payout Engine",
     "license": "Apache-2.0",
@@ -10,11 +10,11 @@
     "engines": {
         "node": ">= 12.0.0"
     },
-    "main": "ponypayer_daemon.js",
+    "main": "payer_daemon.js",
     "dependencies": {
         "config": ">=3.3.3",
         "node-fetch": ">= 2.6.0",
         "eosjs": ">=20.0.0",
-        "mariadb": ">2.5.2"
+        "mariadb": ">=2.5.2"
     }
 }

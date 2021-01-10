@@ -3,17 +3,17 @@
 /*
   Copyright 2020 cc32d9@gmail.com
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+  http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 
@@ -29,8 +29,8 @@ const { TextEncoder, TextDecoder } = require('util');
 
 const url        = config.get('url');
 const engineacc  = config.get('engineacc');
-const payeracc   = config.get('adminacc');
-const payerkey   = config.get('adminkey');
+const payeracc   = config.get('payeracc');
+const payerkey   = config.get('payerkey');
 
 const book_batch_size   = config.get('book_batch_size');
 
@@ -40,7 +40,6 @@ const currency_precision = config.get('schedule.currency_precision');
 const currency_multiplier = 10**currency_precision;
 
 const pool = mariadb.createPool(config.get('mariadb_server'));
-
 
 const timer_keepalive = config.get('timer.keepalive');  // this one prints the keepalive message to console
 const timer_check_accounts = config.get('timer.check_accounts'); // this one checks if new EOSIO accounts exist on chain
@@ -181,26 +180,24 @@ async function partialscan() {
 
 
 async function check_accounts() {
-    let counter = 0;
-    let conn;
-    
+    let conn;    
     try {
+        let counter = 0;
         conn = await pool.getConnection();
-        conn.queryStream
-            ("SELECT DISTINCT recipient AS recipient " +
-             "FROM PAYMENTS " +
-             "LEFT JOIN VALID_ACCOUNTS ON PAYMENTS.recipient=VALID_ACCOUNTS.account " +
-             "WHERE VALID_ACCOUNTS.account IS NULL")
-                .on("error", err => {
-                    console.error(err);
-                })
-            .on("data", row => {
+        let rows = await conn.query
+        ("SELECT DISTINCT recipient AS recipient " +
+         "FROM PAYMENTS " +
+         "LEFT JOIN VALID_ACCOUNTS ON PAYMENTS.recipient=VALID_ACCOUNTS.account " +
+         "WHERE VALID_ACCOUNTS.account IS NULL");
+
+        for( row of rows ) {
+            if( await check_if_valid_account(row.recipient) ) {
+                await conn.query("INSERT INTO VALID_ACCOUNTS (account) VALUES (?)", [row.recipient]);
                 counter++;
-                check_if_valid_account(row.recipient);
-            })
-            .on("end", () => {
-                console.log("check_accounts: found  " + counter + " new valid accounts");
-            });
+            }
+        }
+        
+        console.log("check_accounts: found  " + counter + " new valid accounts out of " + rows.size);
     } catch (err) {
         console.error(err);
     } finally {
@@ -209,7 +206,7 @@ async function check_accounts() {
 
     setTimeout(check_accounts, timer_check_accounts);
 }
-    
+
 
 
 
@@ -283,6 +280,10 @@ async function check_and_book(row) {
 
 async function send_book_tx(rows) {
     try {
+        rows.forEach(function(row) {
+            console.log("booking " + row.new_total + " for " + row.recipient + ", memo: " + row.memo);
+        });
+        
         const result = await api.transact(
             {
                 actions:
@@ -305,11 +306,25 @@ async function send_book_tx(rows) {
                 expireSeconds: 60
             }
         );
-        console.info(bookm transaction ID: ', result.transaction_id);
+        console.info("bookm transaction ID: " + result.transaction_id);
     } catch (e) {
         console.error('ERROR: ' + e);
     }
 }
+
+
+async function check_if_valid_account(acc) {
+    let response = await fetch(url + '/v1/chain/get_account', {
+        method: 'post',
+        body:    JSON.stringify({
+            account_name: acc,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+    return response.ok ? true:false;
+}
+
 
 
 /*

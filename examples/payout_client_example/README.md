@@ -75,5 +75,6 @@ git clone https://github.com/cc32d9/eosio_payout.git
 cd eosio_payout/examples/payout_client_example
 
 mysql < ponypayer_dbsetup.sql
+mysql --database ponypayer < payer_tables.sql
 
 npm install
