@@ -61,6 +61,11 @@ tTcleos system buyram ponypayerxxx ponypayerxxx -k 1000
 tTcleos push action payoutengine newschedule '["ponypayerxxx", "pony", "ponytokenxxx", "1.0000 PONY", "A pony!"]' -p ponypayerxxx
 ```
 
+# top-up the payer engine
+tTcleos push action ponytokenxxx transfer '["ponypayerxxx", "payoutengine", "10000.0000 PONY", "top-up"]' -p ponypayerxxx
+
+
+
 ## Payer server environment
 
 ```
@@ -72,9 +77,50 @@ apt-get install -y nodejs
 
 cd /opt
 git clone https://github.com/cc32d9/eosio_payout.git
-cd eosio_payout/examples/payout_client_example
+cd eosio_payout
 
-mysql < ponypayer_dbsetup.sql
-mysql --database ponypayer < payer_tables.sql
+mysql < examples/pony/ponypayer_dbsetup.sql
+mysql --database ponypayer < payer_daemon/payer_tables.sql
 
+cd payer_daemon
 npm install
+
+mkdir config
+cat >config/default.json <<'EOT'
+{
+    "url": "https://testnet.persiantelos.com",
+    "engineacc": "payoutengine",
+    "payeracc": "ponypayerxxx",
+    "payerkey": "5*************************************",
+
+    "book_batch_size": 30,
+
+    "schedule": {
+        "name": "pony",
+        "currency": "PONY",
+        "currency_precision": 4
+    },
+
+    "mariadb_server": {
+        "host": "localhost",
+        "user": "ponypayer",
+        "password": "ijnew228dfvds",
+        "database": "ponypayer",
+        "connectionLimit": 5
+    },
+    
+    "timer": {
+        "keepalive": 3600000,
+        "check_accounts": 20000,
+        "fullscan": 20000,
+        "partialscan": 5000
+    }
+}
+EOT
+
+node payer_daemon.js
+```
+
+The node process will scan the PAYMENTS table periodically and book
+new payments if needed.
+

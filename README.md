@@ -293,6 +293,20 @@ recipients.
 ```
 
 
+## Payer daemon script
+
+The folder `payer_daemon` in Git repository contains a Nodejs script
+that can be used for automating the outgoing payments. It checks the
+PAYMENTS table periodically and compares if the sum of payments for
+each account is larger than the booked amount, and then books the
+corresponding amounts at the payer engine.
+
+See [the PONY token example](examples/pony/) that demonstrates the
+payer script on telos testnet.
+
+
+
+
 
 
 ## Copyright and License

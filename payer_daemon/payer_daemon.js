@@ -73,7 +73,7 @@ async function keepaalive() {
 
 async function fullscan() {
     full_scan_running = true;
-    console.log("fullscan started");
+    // console.log("fullscan started");
 
     let booked_totals = new Map();
     let counter = 0;
@@ -97,7 +97,7 @@ async function fullscan() {
                     row.due > booked_totals.get(row.recipient) ) {
 
                     counter++;
-                    
+
                     if( row.ts > latest_payment_timestamp ) {
                         latest_payment_timestamp = row.ts;
                     }
@@ -110,11 +110,13 @@ async function fullscan() {
                 }
             })
             .on("end", () => {
-                if( book_batch.size > 0 ) {
+                if( book_batch.length > 0 ) {
                     send_book_tx(book_batch.slice());
                     book_batch = new Array();
                 }
-                console.log("fullscan: sent " + counter + " bookings");
+                if( counter > 0 ) {
+                    console.log("fullscan: sent " + counter + " bookings");
+                }
             });
     } catch (err) {
         console.error(err);
@@ -162,11 +164,13 @@ async function partialscan() {
                                     memo: row.memo});
                 })
                 .on("end", () => {
-                    if( book_batch.size > 0 ) {
+                    if( book_batch.length > 0 ) {
                         send_book_tx(book_batch.slice());
                         book_batch = new Array();
                     }
-                    console.log("partialscan: found  " + counter + " new payments");
+                    if( counter > 0 ) {
+                        console.log("partialscan: found  " + counter + " new payments");
+                    }
                 });
         } catch (err) {
             console.error(err);
@@ -180,7 +184,8 @@ async function partialscan() {
 
 
 async function check_accounts() {
-    let conn;    
+    // console.log("check_accounts started");
+    let conn;
     try {
         let counter = 0;
         conn = await pool.getConnection();
@@ -195,9 +200,14 @@ async function check_accounts() {
                 await conn.query("INSERT INTO VALID_ACCOUNTS (account) VALUES (?)", [row.recipient]);
                 counter++;
             }
+            else {
+                console.log("check_accounts: " + row.recipient + " is not a valid account");
+            }
         }
-        
-        console.log("check_accounts: found  " + counter + " new valid accounts out of " + rows.size);
+
+        if( rows.length > 0 && counter > 0 ) {
+            console.log("check_accounts: found  " + counter + " new valid accounts out of " + rows.length);
+        }
     } catch (err) {
         console.error(err);
     } finally {
@@ -214,7 +224,7 @@ function push_book_batch(recipient, due, memo) {
     book_batch.push({recipient: recipient,
                      new_total: parseFloat(due).toFixed(currency_precision) + " " + currency,
                      memo: memo});
-    if( book_batch.size >= book_batch_size ) {
+    if( book_batch.length >= book_batch_size ) {
         send_book_tx(book_batch.slice());
         book_batch = new Array();
     }
@@ -222,7 +232,7 @@ function push_book_batch(recipient, due, memo) {
 
 
 
-async function fetch_booked_totals(totals_map, nextkey="") {
+async function fetch_booked_totals(totals_map, nextkey='0') {
     let response = await fetch(url + '/v1/chain/get_table_rows', {
         method: 'post',
         body:    JSON.stringify({
@@ -230,23 +240,25 @@ async function fetch_booked_totals(totals_map, nextkey="") {
             code: engineacc,
             scope: schedule_name,
             table: 'recipients',
-            key_type: 'name',
+            key_type: 'i64',
             lower_bound: nextkey
         }),
         headers: { 'Content-Type': 'application/json' },
     });
 
     let data = await response.json();
-    data.rows.forEach(function(row) {
-        let amount = parseInt(row.booked_total)/currency_multiplier;
-        totals_map.set(row.account, amount.toFixed(currency_precision));
-    });
+    if( data.rows ) {
+        data.rows.forEach(function(row) {
+            let amount = parseInt(row.booked_total)/currency_multiplier;
+            totals_map.set(row.account, amount.toFixed(currency_precision));
+        });
+    }
 
     if( data.more ) {
         return fetch_booked_totals(totals_map, data.next_key);
     }
 
-    console.log("fetch_booked_totals: retrieved " + totals_map.size + " balances");
+    // console.log("fetch_booked_totals: retrieved " + totals_map.size + " balances");
     return;
 }
 
@@ -268,7 +280,7 @@ async function check_and_book(row) {
 
     let data = await response.json();
     let amount = 0;
-    if( data.rows.size > 0 ) {
+    if( data.rows.length > 0 ) {
         amount = parseInt(data.rows[0].booked_total)/currency_multiplier;
     }
 
@@ -283,7 +295,7 @@ async function send_book_tx(rows) {
         rows.forEach(function(row) {
             console.log("booking " + row.new_total + " for " + row.recipient + ", memo: " + row.memo);
         });
-        
+
         const result = await api.transact(
             {
                 actions:
