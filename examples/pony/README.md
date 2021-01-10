@@ -59,10 +59,10 @@ tTcleos system buyram ponypayerxxx ponypayerxxx -k 1000
 
 # register the schedule
 tTcleos push action payoutengine newschedule '["ponypayerxxx", "pony", "ponytokenxxx", "1.0000 PONY", "A pony!"]' -p ponypayerxxx
-```
 
 # top-up the payer engine
 tTcleos push action ponytokenxxx transfer '["ponypayerxxx", "payoutengine", "10000.0000 PONY", "top-up"]' -p ponypayerxxx
+```
 
 
 
