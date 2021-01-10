@@ -1,0 +1,20 @@
+{
+    "name": "ponypayer_example",
+    "version": "0.0.1",
+    "description": "Example payer script for EOSIO Payout Engine",
+    "license": "Apache-2.0",
+    "author": {
+        "name": "cc32d9 | EOS Amsterdam",
+        "url": "https://github.com/cc32d9"
+    },
+    "engines": {
+        "node": ">= 12.0.0"
+    },
+    "main": "ponypayer_daemon.js",
+    "dependencies": {
+        "config": ">=3.3.3",
+        "node-fetch": ">= 2.6.0",
+        "eosjs": ">=20.0.0",
+        "mariadb": ">2.5.2"
+    }
+}
