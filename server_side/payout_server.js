@@ -188,14 +188,14 @@ async function runpayouts() {
                             actor: adminacc,
                             permission: 'active'} ],
                         data: {
-                            count: runpayouts_limit
+                            count: runpayouts_limit + Math.floor(Math.random() * 10)
                         },
                     }
                 ]
             },
             {
-                blocksBehind: 10,
-                expireSeconds: 60
+                blocksBehind: 100,
+                expireSeconds: 600
             }
         );
         console.info('runpayouts transaction ID: ', result.transaction_id);
