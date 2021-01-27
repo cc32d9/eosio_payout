@@ -91,7 +91,7 @@ async function check_dues() {
 
 async function check_unapproved() {
     // console.log("check_unapproved() started");
-    let now = new Date();    
+    let now = new Date();
     fetch_approved(false, async function (acc) {
         if( !has_code_map.has(acc) || now >= has_code_map.get(acc) + timer_recheck_hash ) {
             let hc = await has_code(acc);
@@ -109,7 +109,7 @@ async function check_unapproved() {
 async function push_approved_list() {
     if( approved_list.length > 0 ) {
         let clean = approved_list.slice(0, approvals_limit);
-        approved_list.splice(0, approvals_limit);   
+        approved_list.splice(0, approvals_limit);
         console.log("approving " + clean.length + " accounts");
         await approve(true, clean);
     }
@@ -118,7 +118,7 @@ async function push_approved_list() {
 
 async function check_approved() {
     // console.log("check_approved() started");
-    let now = new Date();    
+    let now = new Date();
     fetch_approved(true, async function (acc) {
         let hc = await has_code(acc);
         if( hc ) {
@@ -173,7 +173,7 @@ async function get_revision() {
     let data = await response.json();
     return (data.rows.length > 0) ? data.rows[0].val_uint : 0;
 }
-    
+
 
 async function runpayouts() {
     try {
@@ -221,14 +221,16 @@ async function fetch_approved(check_approved, callback, idx_low=1) {
     });
 
     let data = await response.json();
-    data.rows.forEach(function(row) {
-        callback(row.account);
-    });
-    
-    if( data.more ) {
-        return fetch_approved(check_approved, callback, data.next_key);
+    if( data ) {
+        data.rows.forEach(function(row) {
+            callback(row.account);
+        });
+
+        if( data.more ) {
+            return fetch_approved(check_approved, callback, data.next_key);
+        }
     }
-    
+
     return;
 }
 
